@@ -58,32 +58,37 @@ class Exporter(object):
             sys.exit(1)
 
     def __init_metrics(self):
+        namespace = 'homematicip'
         labelnames = ['room', 'device_label']
 
-        self.homematicip_info = prometheus_client.Gauge(
-            'homematicip_info',
-            'HomematicIP info',
-            ['api_version']
+        self.version_info = prometheus_client.Gauge(
+            name='version_info',
+            documentation='HomematicIP info',
+            labelnames=['api_version'],
+            namespace=namespace
         )
         self.metric_temperature_actual = prometheus_client.Gauge(
-            'temperature_actual',
-            'Actual temperature',
-            labelnames=labelnames
+            name='temperature_actual',
+            documentation='Actual temperature',
+            labelnames=labelnames,
+            namespace=namespace
         )
         self.metric_temperature_setpoint = prometheus_client.Gauge(
-            'temperature_setpoint',
-            'Set point temperature',
-            labelnames=labelnames
+            name='temperature_setpoint',
+            documentation='Set point temperature',
+            labelnames=labelnames,
+            namespace=namespace
         )
         self.metric_humidity_actual = prometheus_client.Gauge(
-            'humidity_actual',
-            'Actual Humidity',
-            labelnames=labelnames
+            name='humidity_actual',
+            documentation='Actual Humidity',
+            labelnames=labelnames,
+            namespace=namespace
         )
 
     def __collect_homematicip_info(self):
         try:
-            self.homematicip_info.labels(
+            self.version_info.labels(
                 api_version=self.home_client.currentAPVersion
             ).set(1)
             logging.info(
