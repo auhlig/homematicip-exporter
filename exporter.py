@@ -6,7 +6,7 @@ import homematicip
 import prometheus_client
 
 from homematicip.home import Home
-from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, TemperatureHumiditySensorOutdoor
+from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
@@ -106,7 +106,7 @@ class Exporter(object):
             for g in self.home_client.groups:
                 if g.groupType == "META":
                     for d in g.devices:
-                        if isinstance(d, (WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, TemperatureHumiditySensorOutdoor)):
+                        if isinstance(d, (WallMountedThermostatPro, TemperatureHumiditySensorDisplay, TemperatureHumiditySensorWithoutDisplay, TemperatureHumiditySensorOutdoor)):
                             self.__collect_thermostat_metrics(g.label, d)
         except Exception as e:
             logging.warning(
