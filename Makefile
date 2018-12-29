@@ -17,4 +17,8 @@ docker-build:
 docker-push: docker-build
 	docker push $(IMAGE):$(VERSION)
 
+latest: docker-push
+	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
+	docker push $(IMAGE):latest
+
 .PHONY: clean-build docker-build docker-push
