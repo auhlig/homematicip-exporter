@@ -8,7 +8,7 @@ Expose Prometheus metrics from HomematicIP devices using [coreGreenberet/homemat
 
 ### Getting started
 
-1. Generate an auth token for the HomematicIP Access Point before using this exporter. See [coreGreenberet/homematicip-rest-api](https://github.com/coreGreenberet/homematicip-rest-api#usage) for further instructions.
+1. Generate an auth token for the HomematicIP Access Point before using this exporter. Instructions on how to generate an Homematic IP auth token can be found [here](https://github.com/coreGreenberet/homematicip-rest-api#usage).
 2. Pass the path to the config file via flag `--config-file=<path-to-file>` or alternatively use `--auth-token` and `--access-point`.
 
 ### Usage
