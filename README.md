@@ -1,6 +1,7 @@
 HomematicIP Prometheus Exporter
 ===============================
 
+[![Build Status](https://travis-ci.org/auhlig/homematicip-exporter.svg?branch=master)](https://travis-ci.org/auhlig/homematicip-exporter)
 [![Docker Repository](https://img.shields.io/docker/pulls/auhlig/homematicip-exporter.svg?maxAge=604800)](https://hub.docker.com/r/auhlig/homematicip-exporter/)
 
 
