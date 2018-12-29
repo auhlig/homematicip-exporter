@@ -8,4 +8,11 @@ install:
   pip3 install -r requirements.txt
 
 script:
-  - make docker-push
+  - make docker-build
+
+after_success:
+  - >
+    if [ "$TRAVIS_BRANCH" == "master" ]; then
+      echo $DOCKER_PASSWORD | docker login -u="$DOCKER_USERNAME" --password-stdin;
+      make docker-push;
+    fi
