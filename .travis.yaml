@@ -1,0 +1,12 @@
+language: python
+
+matrix:
+  include:
+    - python: 3.7
+      env: TOXENV=py35
+
+install:
+  pip3 install -r requirements.yaml
+
+script:
+  - make docker-push
