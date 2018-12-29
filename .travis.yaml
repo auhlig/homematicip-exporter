@@ -6,7 +6,7 @@ matrix:
       env: TOXENV=py35
 
 install:
-  pip3 install -r requirements.yaml
+  pip3 install -r requirements.txt
 
 script:
   - make docker-push
