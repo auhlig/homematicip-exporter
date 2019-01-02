@@ -85,6 +85,12 @@ class Exporter(object):
             labelnames=labelnames,
             namespace=namespace
         )
+        self.metric_last_status_update = prometheus_client.Gauge(
+            name='last_status_update',
+            documentation="Device last status update",
+            labelnames=labelnames,
+            namespace=namespace
+        )
         self.metric_device_info = prometheus_client.Gauge(
             name='device_info',
             documentation='Device information',
@@ -120,9 +126,12 @@ class Exporter(object):
             device_label=device.label,
             device_type=device.deviceType.lower(),
             firmware_version=device.firmwareVersion,
-            last_status_update=device.lastStatusUpdate.timestamp(),
             permanently_reachable=device.permanentlyReachable
         ).set(1)
+        self.metric_last_status_update.labels(
+            room=room,
+            device_label=device.label
+        ).set(device.lastStatusUpdate.timestamp(),)
         logging.info(
             "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
             .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate, device.permanentlyReachable)
