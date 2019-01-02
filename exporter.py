@@ -59,7 +59,7 @@ class Exporter(object):
     def __init_metrics(self):
         namespace = 'homematicip'
         labelnames = ['room', 'device_label']
-        detail_labelnames = ['device_type', 'firmware_version', 'last_status_update', 'permanently_reachable']
+        detail_labelnames = ['device_type', 'firmware_version', 'permanently_reachable']
 
         self.version_info = prometheus_client.Gauge(
             name='version_info',
@@ -121,6 +121,7 @@ class Exporter(object):
         )
 
     def __collect_device_metrics(self,room, device):
+        # general device info metric
         self.metric_device_info.labels(
             room=room,
             device_label=device.label,
@@ -128,10 +129,11 @@ class Exporter(object):
             firmware_version=device.firmwareVersion,
             permanently_reachable=device.permanentlyReachable
         ).set(1)
+        # last status update metric
         self.metric_last_status_update.labels(
             room=room,
             device_label=device.label
-        ).set(device.lastStatusUpdate.timestamp(),)
+        ).set(device.lastStatusUpdate.timestamp())
         logging.info(
             "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
             .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate, device.permanentlyReachable)
