@@ -4,7 +4,6 @@ import time
 import logging
 import homematicip
 import prometheus_client
-
 from homematicip.home import Home
 from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay,\
      TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay
@@ -60,6 +59,7 @@ class Exporter(object):
     def __init_metrics(self):
         namespace = 'homematicip'
         labelnames = ['room', 'device_label']
+        detail_labelnames = ['device_type', 'firmware_version', 'last_status_update', 'permanently_reachable']
 
         self.version_info = prometheus_client.Gauge(
             name='version_info',
@@ -85,6 +85,12 @@ class Exporter(object):
             labelnames=labelnames,
             namespace=namespace
         )
+        self.metric_device_info = prometheus_client.Gauge(
+            name='device_info',
+            documentation='Device information',
+            labelnames=labelnames+detail_labelnames,
+            namespace=namespace
+        )
 
     def __collect_homematicip_info(self):
         try:
@@ -104,8 +110,22 @@ class Exporter(object):
         self.metric_temperature_setpoint.labels(room=room, device_label=device.label).set(device.setPointTemperature)
         self.metric_humidity_actual.labels(room=room, device_label=device.label).set(device.humidity)
         logging.info(
-            "room: {}, device: {}, temperature_actual: {}, temperature_setpoint: {}, humidity_actual: {}"
+            "room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, humidity_actual: {}"
             .format(room, device.label, device.actualTemperature, device.setPointTemperature, device.humidity)
+        )
+
+    def __collect_device_metrics(self,room, device):
+        self.metric_device_info.labels(
+            room=room,
+            device_label=device.label,
+            device_type=device.deviceType.lower(),
+            firmware_version=device.firmwareVersion,
+            last_status_update=device.lastStatusUpdate.timestamp(),
+            permanently_reachable=device.permanentlyReachable
+        ).set(1)
+        logging.info(
+            "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
+            .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate, device.permanentlyReachable)
         )
 
     def collect(self):
@@ -114,9 +134,13 @@ class Exporter(object):
             for g in self.home_client.groups:
                 if g.groupType == "META":
                     for d in g.devices:
+                        # collect general device metrics
+                        self.__collect_device_metrics(g.label, d)
+                        # collect temperature, humidity
                         if isinstance(d, (WallMountedThermostatPro, TemperatureHumiditySensorDisplay,
                                           TemperatureHumiditySensorWithoutDisplay, TemperatureHumiditySensorOutdoor)):
                             self.__collect_thermostat_metrics(g.label, d)
+
         except Exception as e:
             logging.warning(
                 "collecting status from device(s) failed with: {}".format(str(e))
@@ -135,7 +159,7 @@ if __name__ == '__main__':
                         default='/etc/homematicip-rest-api/config.ini',
                         help='path to the configuration file')
     parser.add_argument('--collect-interval-seconds',
-                        default=10,
+                        default=30,
                         help='collection interval in seconds')
     parser.add_argument('--auth-token',
                         default=None,
