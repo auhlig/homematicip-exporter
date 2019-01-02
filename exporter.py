@@ -4,42 +4,50 @@ import time
 import logging
 import homematicip
 import prometheus_client
-from homematicip.home import Home
+from homematicip.home import Home, EventType
 from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay,\
-     TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay
+     TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, ShutterContact, HeatingThermostat
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
 
 class Exporter(object):
-    # the HomematicIP client
-    home_client = None
-
+    """
+    Prometheus Exporter for Homematic IP devices
+    """
     def __init__(self, args):
-        self.__metric_port = args.metric_port
+        """
+        initializes the exporter
+
+        :param args: the argparse.Args
+        """
+        
+        self.__home_client = None
+        self.__metric_port = int(args.metric_port)
         self.__collect_interval_seconds = args.collect_interval_seconds
+        self.__log_level = int(args.log_level)
 
         logging.info(
             "using config file '{}' and exposing metrics on port '{}'".format(args.config_file, self.__metric_port)
         )
 
-        self.__init_client(args.config_file, args.auth_token, args.access_point)
+        self.__init_client(args.config_file, args.auth_token, args.access_point, args.enable_event_metrics)
         self.__init_metrics()
         self.__collect_homematicip_info()
         try:
-            prometheus_client.start_http_server(int(self.__metric_port))
+            prometheus_client.start_http_server(self.__metric_port)
         except Exception as e:
             logging.fatal(
                 "starting the http server on port '{}' failed with: {}".format(self.__metric_port, str(e))
             )
             sys.exit(1)
 
-    def __init_client(self, config_file, auth_token, access_point):
+    def __init_client(self, config_file, auth_token, access_point, enable_event_metrics):
         if auth_token and access_point:
             config = homematicip.HmipConfig(
                 auth_token=auth_token,
                 access_point= access_point,
-                log_level=30,
+                log_level=self.__log_level,
                 log_file='hmip.log',
                 raw_config=None,
             )
@@ -47,9 +55,13 @@ class Exporter(object):
             config = homematicip.load_config_file(config_file=config_file)
 
         try:
-            self.home_client = Home()
-            self.home_client.set_auth_token(config.auth_token)
-            self.home_client.init(config.access_point)
+            self.__home_client = Home()
+            self.__home_client.set_auth_token(config.auth_token)
+            self.__home_client.init(config.access_point)
+            # metrics on events
+            if enable_event_metrics:
+                self.__home_client.onEvent += self.__collect_event_metrics
+                self.__home_client.enable_events()
         except Exception as e:
             logging.fatal(
                 "Initializing HomematicIP client failed with: {}".format(str(e))
@@ -60,6 +72,9 @@ class Exporter(object):
         namespace = 'homematicip'
         labelnames = ['room', 'device_label']
         detail_labelnames = ['device_type', 'firmware_version', 'permanently_reachable']
+        event_device_labelnames = ['device_label']
+        event_group_labelnames = ['group_label']
+        event_labelnames = ['type', 'window_state', 'sabotage']
 
         self.version_info = prometheus_client.Gauge(
             name='version_info',
@@ -97,14 +112,26 @@ class Exporter(object):
             labelnames=labelnames+detail_labelnames,
             namespace=namespace
         )
+        self.metric_device_event = prometheus_client.Counter(
+            name='device_event',
+            documentation='events triggered by a device',
+            labelnames=event_device_labelnames+event_labelnames,
+            namespace=namespace
+        )
+        self.metric_group_event = prometheus_client.Counter(
+            name='group_event',
+            documentation='events triggered by a group',
+            labelnames=event_group_labelnames+event_labelnames,
+            namespace=namespace,
+        )
 
     def __collect_homematicip_info(self):
         try:
             self.version_info.labels(
-                api_version=self.home_client.currentAPVersion
+                api_version=self.__home_client.currentAPVersion
             ).set(1)
             logging.info(
-                "current homematic ip api version: '{}'".format(self.home_client.currentAPVersion)
+                "current homematic ip api version: '{}'".format(self.__home_client.currentAPVersion)
             )
         except Exception as e:
             logging.warning(
@@ -120,7 +147,7 @@ class Exporter(object):
             .format(room, device.label, device.actualTemperature, device.setPointTemperature, device.humidity)
         )
 
-    def __collect_device_metrics(self,room, device):
+    def __collect_device_info_metrics(self,room, device):
         # general device info metric
         self.metric_device_info.labels(
             room=room,
@@ -139,14 +166,45 @@ class Exporter(object):
             .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate, device.permanentlyReachable)
         )
 
+    def __collect_event_metrics(self, eventList):
+        for event in eventList:
+            type = event["eventType"]
+            data = event["data"]
+
+            if type is EventType.DEVICE_CHANGED:
+                _window_state = _sabotage = None
+                if isinstance(data, ShutterContact):
+                    _window_state = str(data.windowState).lower()
+                    _sabotage = str(data.sabotage).lower()
+                    self.metric_device_event.labels(
+                        device_label=data.label,
+                        type=str(type).lower(),
+                        window_state=_window_state,
+                        sabotage=_sabotage
+                    ).inc()
+                    logging.info(
+                        "got device event type: {}, label: {}, window_state: {}, sabotage: {}"
+                            .format(type, data.label, _window_state, _sabotage)
+                    )
+
+            elif type is EventType.GROUP_CHANGED:
+                #TODO:
+                pass
+            elif type is EventType.SECURITY_JOURNAL_CHANGED:
+                #TODO:
+                pass
+
     def collect(self):
+        """
+        collect discovers all devices and generates metrics
+        """
         try:
-            self.home_client.get_current_state()
-            for g in self.home_client.groups:
+            self.__home_client.get_current_state()
+            for g in self.__home_client.groups:
                 if g.groupType == "META":
                     for d in g.devices:
                         # collect general device metrics
-                        self.__collect_device_metrics(g.label, d)
+                        self.__collect_device_info_metrics(g.label, d)
                         # collect temperature, humidity
                         if isinstance(d, (WallMountedThermostatPro, TemperatureHumiditySensorDisplay,
                                           TemperatureHumiditySensorWithoutDisplay, TemperatureHumiditySensorOutdoor)):
@@ -162,7 +220,10 @@ class Exporter(object):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='HomematicIP Prometheus Exporter')
+    parser = argparse.ArgumentParser(
+        description='HomematicIP Prometheus Exporter',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument('--metric-port',
                         default=8000,
                         help='port to expose the metrics on')
@@ -178,6 +239,12 @@ if __name__ == '__main__':
     parser.add_argument('--access-point',
                         default=None,
                         help='homematic IP access point id')
+    parser.add_argument('--enable-event-metrics',
+                        default=False,
+                        help='collect event metrics')
+    parser.add_argument('--log-level',
+                        default=30,
+                        help='log level')
 
     # Start up the server to expose the metrics.
     e = Exporter(parser.parse_args())

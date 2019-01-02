@@ -18,20 +18,28 @@ Expose Prometheus metrics from HomematicIP devices using [coreGreenberet/homemat
 exporter.py [-h] [--metric-port METRIC_PORT]
                  [--config-file CONFIG_FILE]
                  [--collect-interval-seconds COLLECT_INTERVAL_SECONDS]
-                 [--auth-token AUTH_TOKEN] [--access-point ACCESS_POINT]
+                 [--auth-token AUTH_TOKEN] 
+                 [--access-point ACCESS_POINT]
+                 [--enable-event-metrics ENABLE_EVENT_METRICS]
+                 [--log-level LOG_LEVEL]
 
 HomematicIP Prometheus Exporter
 
 optional arguments:
   -h, --help            show this help message and exit
   --metric-port METRIC_PORT
-                        port to expose the metrics on
+                        port to expose the metrics on (default: 8000)
   --config-file CONFIG_FILE
-                        path to the configuration file
+                        path to the configuration file (default:
+                        /etc/homematicip-rest-api/config.ini)
   --collect-interval-seconds COLLECT_INTERVAL_SECONDS
-                        collection interval in seconds
+                        collection interval in seconds (default: 30)
   --auth-token AUTH_TOKEN
-                        homematic IP auth token
+                        homematic IP auth token (default: None)
   --access-point ACCESS_POINT
-                        homematic IP access point id
+                        homematic IP access point id (default: None)
+  --enable-event-metrics ENABLE_EVENT_METRICS
+                        collect event metrics (default: False)
+  --log-level LOG_LEVEL
+                        log level (default: 30)
 ```
