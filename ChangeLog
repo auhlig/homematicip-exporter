@@ -1,0 +1,22 @@
+CHANGES
+=======
+
+* bump homematicip to 0.10.5
+* include events. print default values in help
+* fix metric labels
+* last\_status\_update metric
+* add device metrics, increase collect-interval-seconds to 30
+* fix metric namespace
+* make latest
+* add build status badge
+* travis
+* py3.5
+* travis
+* travis
+* travis
+* respect max line length
+* add TemperatureHumiditySensorDisplay
+* fix dockerfile
+* readme
+* init
+* Initial commit

@@ -130,7 +130,7 @@ class Exporter(object):
             self.version_info.labels(
                 api_version=self.__home_client.currentAPVersion
             ).set(1)
-            logging.info(
+            logging.debug(
                 "current homematic ip api version: '{}'".format(self.__home_client.currentAPVersion)
             )
         except Exception as e:
@@ -139,15 +139,25 @@ class Exporter(object):
             )
 
     def __collect_thermostat_metrics(self, room, device):
-        self.metric_temperature_actual.labels(room=room, device_label=device.label).set(device.actualTemperature)
-        self.metric_temperature_setpoint.labels(room=room, device_label=device.label).set(device.setPointTemperature)
-        self.metric_humidity_actual.labels(room=room, device_label=device.label).set(device.humidity)
+        if device.actualTemperature:
+            self.metric_temperature_actual.labels(room=room, device_label=device.label).set(device.actualTemperature)
+
+        if device.setPointTemperature:
+            self.metric_temperature_setpoint.labels(room=room, device_label=device.label).set(device.setPointTemperature)
+
+        if device.humidity:
+            self.metric_humidity_actual.labels(room=room, device_label=device.label).set(device.humidity)
         logging.info(
             "room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, humidity_actual: {}"
             .format(room, device.label, device.actualTemperature, device.setPointTemperature, device.humidity)
         )
 
     def __collect_device_info_metrics(self,room, device):
+        logging.info(
+            "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
+                .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate,
+                        device.permanentlyReachable)
+        )
         # general device info metric
         self.metric_device_info.labels(
             room=room,
@@ -156,15 +166,13 @@ class Exporter(object):
             firmware_version=device.firmwareVersion,
             permanently_reachable=device.permanentlyReachable
         ).set(1)
-        # last status update metric
-        self.metric_last_status_update.labels(
-            room=room,
-            device_label=device.label
-        ).set(device.lastStatusUpdate)
-        logging.info(
-            "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
-            .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate, device.permanentlyReachable)
-        )
+        if device.lastStatusUpdate:
+            # last status update metric
+            self.metric_last_status_update.labels(
+                room=room,
+                device_label=device.label
+            ).set(device.lastStatusUpdate.timestamp())
+
 
     def __collect_event_metrics(self, eventList):
         for event in eventList:
@@ -205,7 +213,7 @@ class Exporter(object):
 
         except Exception as e:
             logging.warning(
-                "collecting status from device(s) failed with: {}".format(str(e))
+                "collecting status from device(s) failed with: {1}".format(str(e))
             )
         finally:
             logging.info('waiting {}s before next collection cycle'.format(self.__collect_interval_seconds))
