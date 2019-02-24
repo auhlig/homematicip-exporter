@@ -160,7 +160,7 @@ class Exporter(object):
         self.metric_last_status_update.labels(
             room=room,
             device_label=device.label
-        ).set(device.lastStatusUpdate.timestamp())
+        ).set(device.lastStatusUpdate)
         logging.info(
             "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
             .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate, device.permanentlyReachable)
@@ -186,13 +186,6 @@ class Exporter(object):
                         "got device event type: {}, label: {}, window_state: {}, sabotage: {}"
                             .format(type, data.label, _window_state, _sabotage)
                     )
-
-            elif type is EventType.GROUP_CHANGED:
-                #TODO:
-                pass
-            elif type is EventType.SECURITY_JOURNAL_CHANGED:
-                #TODO:
-                pass
 
     def collect(self):
         """
