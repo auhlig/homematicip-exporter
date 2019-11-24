@@ -94,6 +94,24 @@ class Exporter(object):
             labelnames=labelnames,
             namespace=namespace
         )
+        self.metric_valve_adaption_needed = prometheus_client.Gauge(
+            name='valve_adaption_needed',
+            documentation='must the adaption re-run?',
+            labelnames=labelnames,
+            namespace=namespace
+        )
+        self.metric_temperature_offset = prometheus_client.Gauge(
+            name='temperature_offset',
+            documentation='the offset temperature for the thermostat',
+            labelnames=labelnames,
+            namespace=namespace
+        )
+        self.metric_valve_position = prometheus_client.Gauge(
+            name='valve_position',
+            documentation='the current position of the valve 0.0 = closed, 1.0 max opened',
+            labelnames=labelnames,
+            namespace=namespace
+        )
         self.metric_humidity_actual = prometheus_client.Gauge(
             name='humidity_actual',
             documentation='Actual Humidity',
@@ -150,6 +168,22 @@ class Exporter(object):
         logging.info(
             "room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, humidity_actual: {}"
             .format(room, device.label, device.actualTemperature, device.setPointTemperature, device.humidity)
+        )
+
+    def __collect_heating_metrics(self, room, device):
+
+        # Do not check with if as 0 equals false
+        self.metric_temperature_actual.labels(room=room, device_label=device.label).set(device.valveActualTemperature)
+        self.metric_temperature_setpoint.labels(room=room, device_label=device.label).set(device.setPointTemperature)
+        self.metric_valve_adaption_needed.labels(room=room, device_label=device.label).set(device.automaticValveAdaptionNeeded)
+        self.metric_temperature_offset.labels(room=room, device_label=device.label).set(device.temperatureOffset)
+        self.metric_valve_position.labels(room=room, device_label=device.label).set(device.valvePosition)
+
+        logging.info(
+            "room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, valve_adaption_needed: {}, "
+            "temperature_offset {}, valve_position: {}"
+                .format(room, device.label, device.valveActualTemperature, device.setPointTemperature,
+                        device.automaticValveAdaptionNeeded, device.temperatureOffset, device.valvePosition)
         )
 
     def __collect_device_info_metrics(self,room, device):
@@ -210,6 +244,9 @@ class Exporter(object):
                         if isinstance(d, (WallMountedThermostatPro, TemperatureHumiditySensorDisplay,
                                           TemperatureHumiditySensorWithoutDisplay, TemperatureHumiditySensorOutdoor)):
                             self.__collect_thermostat_metrics(g.label, d)
+                        elif isinstance(d, HeatingThermostat):
+                            logging.info("Device of type heating")
+                            self.__collect_heating_metrics(g.label, d)
 
         except Exception as e:
             logging.warning(
