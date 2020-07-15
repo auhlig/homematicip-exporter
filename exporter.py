@@ -5,8 +5,9 @@ import logging
 import homematicip
 import prometheus_client
 from homematicip.home import Home, EventType
-from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay,\
-     TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, ShutterContact, HeatingThermostat
+from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, \
+    TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, ShutterContact, HeatingThermostat, \
+    PlugableSwitchMeasuring
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
@@ -130,6 +131,12 @@ class Exporter(object):
             labelnames=labelnames+detail_labelnames,
             namespace=namespace
         )
+        self.metric_power_consumption = prometheus_client.Gauge(
+            name='power_consumption',
+            documentation='Power consumption',
+            labelnames=labelnames,
+            namespace=namespace
+        )
         self.metric_device_event = prometheus_client.Counter(
             name='device_event',
             documentation='events triggered by a device',
@@ -207,6 +214,18 @@ class Exporter(object):
                 device_label=device.label
             ).set(device.lastStatusUpdate.timestamp())
 
+    def __collect_power_metrics(self, room, device):
+        logging.info(
+            "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
+                .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate,
+                        device.permanentlyReachable)
+        )
+        # general device info metric
+        logging.info(device.currentPowerConsumption)
+        self.metric_power_consumption.labels(
+            room=room,
+            device_label=device.label
+        ).set(device.currentPowerConsumption)
 
     def __collect_event_metrics(self, eventList):
         for event in eventList:
@@ -247,6 +266,9 @@ class Exporter(object):
                         elif isinstance(d, HeatingThermostat):
                             logging.info("Device of type heating")
                             self.__collect_heating_metrics(g.label, d)
+                        elif isinstance(d, PlugableSwitchMeasuring):
+                            logging.info("Device of type PlugableSwitchMeasuring")
+                            self.__collect_power_metrics(g.label, d)
 
         except Exception as e:
             logging.warning(
