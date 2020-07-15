@@ -1,2 +1,2 @@
-homematicip ~= 0.10.5
+homematicip ~= 0.10.19
 prometheus_client >= 0.5.0
