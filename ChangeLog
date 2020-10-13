@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* rebase docker image on alpine image
 * only report if there's something to report
 * bump homematicip to 0.10.5
 * include events. print default values in help
