@@ -221,11 +221,15 @@ class Exporter(object):
                         device.permanentlyReachable)
         )
         # general device info metric
-        logging.info(device.currentPowerConsumption)
-        self.metric_power_consumption.labels(
-            room=room,
-            device_label=device.label
-        ).set(device.currentPowerConsumption)
+        if device.currentPowerConsumption:
+            logging.info(device.currentPowerConsumption)
+            self.metric_power_consumption.labels(
+                room=room,
+                device_label=device.label
+            ).set(device.currentPowerConsumption)
+        else:
+            logging.info(f"{device.deviceType} {device.label} has no current power consumption available, "
+                         f"maybe its not plugged in")
 
     def __collect_event_metrics(self, eventList):
         for event in eventList:
