@@ -6,7 +6,8 @@ import homematicip
 import prometheus_client
 from homematicip.home import Home, EventType
 from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, \
-    TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, ShutterContact, HeatingThermostat, \
+    TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, HeatingThermostat, \
+    ShutterContact, ShutterContactMagnetic, ContactInterface, RotaryHandleSensor, \
     Switch, SwitchMeasuring
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
@@ -148,7 +149,14 @@ class Exporter(object):
             documentation='Switch turned on',
             labelnames=labelnames,
             namespace=namespace
-        )                
+        )
+        self.metric_window_state = prometheus_client.Enum(
+            states = ["OPEN", "CLOSED"],
+            name='window_state',
+            documentation='Window state',
+            labelnames=labelnames,
+            namespace=namespace
+        )                        
         self.metric_device_event = prometheus_client.Counter(
             name='device_event',
             documentation='events triggered by a device',
@@ -229,6 +237,9 @@ class Exporter(object):
     def __collect_switch_metrics(self, room, device):
         self.metric_switch_on.labels(room=room,device_label=device.label).set(device.on)
 
+    def __collect_window_state(self, room, device):
+        self.metric_window_state.labels(room=room,device_label=device.label).state(device.windowState)
+
     def __collect_power_metrics(self, room, device):
         logging.info(
             "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
@@ -286,6 +297,9 @@ class Exporter(object):
                         elif isinstance(d, Switch):
                             logging.info("Device of type switch measuring")
                             self.__collect_switch_metrics(g.label, d)
+                        elif isinstance(d, (ShutterContact, ShutterContactMagnetic, ContactInterface, RotaryHandleSensor)):
+                            logging.info("Device of type contact")
+                            self.__collect_window_state(g.label, d)
 
         except Exception as e:
             logging.warning(
