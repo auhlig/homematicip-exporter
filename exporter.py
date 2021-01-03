@@ -193,7 +193,7 @@ class Exporter(object):
         if device.humidity:
             self.metric_humidity_actual.labels(room=room, device_label=device.label).set(device.humidity)
         logging.info(
-            "room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, humidity_actual: {}"
+            "found device: room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, humidity_actual: {}"
             .format(room, device.label, device.actualTemperature, device.setPointTemperature, device.humidity)
         )
 
@@ -207,7 +207,7 @@ class Exporter(object):
         self.metric_valve_position.labels(room=room, device_label=device.label).set(device.valvePosition)
 
         logging.info(
-            "room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, valve_adaption_needed: {}, "
+            "found device: room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, valve_adaption_needed: {}, "
             "temperature_offset {}, valve_position: {}"
                 .format(room, device.label, device.valveActualTemperature, device.setPointTemperature,
                         device.automaticValveAdaptionNeeded, device.temperatureOffset, device.valvePosition)
@@ -235,19 +235,24 @@ class Exporter(object):
             ).set(device.lastStatusUpdate.timestamp())
 
     def __collect_switch_metrics(self, room, device):
+        logging.info(
+            "found device: room: {}, label: {}, switch_status: {}"
+                .format(room, device.label, device.on)
+        )        
         self.metric_switch_on.labels(room=room,device_label=device.label).set(device.on)
 
     def __collect_window_state(self, room, device):
+        logging.info(
+            "found device: room: {}, label: {}, window_state: {}"
+                .format(room, device.label, device.windowState)
+        )        
         self.metric_window_state.labels(room=room,device_label=device.label).state(device.windowState)
 
     def __collect_power_metrics(self, room, device):
         logging.info(
-            "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
-                .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate,
-                        device.permanentlyReachable)
+            "found device: room: {}, label: {}, power_consumption: {}, energy_counter: {}"
+                .format(room, device.label, device.currentPowerConsumption, device.energyCounter)
         )
-        # general device info metric
-        logging.info(device.currentPowerConsumption)
         self.metric_power_consumption.labels(room=room,device_label=device.label).set(device.currentPowerConsumption),
         self.metric_energy_counter.labels(room=room,device_label=device.label).set(device.energyCounter)
 
