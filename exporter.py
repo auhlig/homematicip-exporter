@@ -7,7 +7,7 @@ import prometheus_client
 from homematicip.home import Home, EventType
 from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, \
     TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, ShutterContact, HeatingThermostat, \
-    PlugableSwitchMeasuring, BrandSwitchMeasuring
+    Switch, SwitchMeasuring
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
@@ -142,7 +142,13 @@ class Exporter(object):
             documentation='Energy Counter',
             labelnames=labelnames,
             namespace=namespace
-        )        
+        )
+        self.metric_switch_on = prometheus_client.Gauge(
+            name='switch',
+            documentation='Switch turned on',
+            labelnames=labelnames,
+            namespace=namespace
+        )                
         self.metric_device_event = prometheus_client.Counter(
             name='device_event',
             documentation='events triggered by a device',
@@ -220,6 +226,9 @@ class Exporter(object):
                 device_label=device.label
             ).set(device.lastStatusUpdate.timestamp())
 
+    def __collect_switch_metrics(self, room, device):
+        self.metric_switch_on.labels(room=room,device_label=device.label).set(device.on)
+
     def __collect_power_metrics(self, room, device):
         logging.info(
             "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
@@ -270,9 +279,13 @@ class Exporter(object):
                         elif isinstance(d, HeatingThermostat):
                             logging.info("Device of type heating")
                             self.__collect_heating_metrics(g.label, d)
-                        elif isinstance(d, (PlugableSwitchMeasuring, BrandSwitchMeasuring)):
+                        elif isinstance(d, SwitchMeasuring):
                             logging.info("Device of type switch measuring")
                             self.__collect_power_metrics(g.label, d)
+                            self.__collect_switch_metrics(g.label, d)                            
+                        elif isinstance(d, Switch):
+                            logging.info("Device of type switch measuring")
+                            self.__collect_switch_metrics(g.label, d)
 
         except Exception as e:
             logging.warning(
