@@ -7,7 +7,7 @@ import prometheus_client
 from homematicip.home import Home, EventType
 from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, \
     TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, ShutterContact, HeatingThermostat, \
-    PlugableSwitchMeasuring
+    PlugableSwitchMeasuring, BrandSwitchMeasuring
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
@@ -137,6 +137,12 @@ class Exporter(object):
             labelnames=labelnames,
             namespace=namespace
         )
+        self.metric_energy_counter = prometheus_client.Gauge(
+            name='energy_counter',
+            documentation='Energy Counter',
+            labelnames=labelnames,
+            namespace=namespace
+        )        
         self.metric_device_event = prometheus_client.Counter(
             name='device_event',
             documentation='events triggered by a device',
@@ -222,10 +228,8 @@ class Exporter(object):
         )
         # general device info metric
         logging.info(device.currentPowerConsumption)
-        self.metric_power_consumption.labels(
-            room=room,
-            device_label=device.label
-        ).set(device.currentPowerConsumption)
+        self.metric_power_consumption.labels(room=room,device_label=device.label).set(device.currentPowerConsumption),
+        self.metric_energy_counter.labels(room=room,device_label=device.label).set(device.energyCounter)
 
     def __collect_event_metrics(self, eventList):
         for event in eventList:
@@ -266,8 +270,8 @@ class Exporter(object):
                         elif isinstance(d, HeatingThermostat):
                             logging.info("Device of type heating")
                             self.__collect_heating_metrics(g.label, d)
-                        elif isinstance(d, PlugableSwitchMeasuring):
-                            logging.info("Device of type PlugableSwitchMeasuring")
+                        elif isinstance(d, (PlugableSwitchMeasuring, BrandSwitchMeasuring)):
+                            logging.info("Device of type switch measuring")
                             self.__collect_power_metrics(g.label, d)
 
         except Exception as e:
