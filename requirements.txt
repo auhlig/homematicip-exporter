@@ -1,2 +1,3 @@
-homematicip ~= 0.11.0
-prometheus_client >= 0.8.0
+homematicip ~= 0.13.0
+prometheus_client >= 0.9.0
+configargparse

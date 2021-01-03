@@ -3,11 +3,13 @@ import sys
 import time
 import logging
 import homematicip
+import configargparse
 import prometheus_client
 from homematicip.home import Home, EventType
 from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, \
-    TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, ShutterContact, HeatingThermostat, \
-    PlugableSwitchMeasuring
+    TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, HeatingThermostat, \
+    ShutterContact, ShutterContactMagnetic, ContactInterface, RotaryHandleSensor, \
+    Switch, SwitchMeasuring, Dimmer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
@@ -137,6 +139,31 @@ class Exporter(object):
             labelnames=labelnames,
             namespace=namespace
         )
+        self.metric_energy_counter = prometheus_client.Gauge(
+            name='energy_counter',
+            documentation='Energy Counter',
+            labelnames=labelnames,
+            namespace=namespace
+        )
+        self.metric_switch_on = prometheus_client.Gauge(
+            name='switch',
+            documentation='Switch turned on',
+            labelnames=labelnames,
+            namespace=namespace
+        )
+        self.metric_dim_level = prometheus_client.Gauge(
+            name='dim_level',
+            documentation='Current dimmer level',
+            labelnames=labelnames,
+            namespace=namespace
+        )        
+        self.metric_window_state = prometheus_client.Enum(
+            states = ["OPEN", "CLOSED"],
+            name='window_state',
+            documentation='Window state',
+            labelnames=labelnames,
+            namespace=namespace
+        )                        
         self.metric_device_event = prometheus_client.Counter(
             name='device_event',
             documentation='events triggered by a device',
@@ -173,7 +200,7 @@ class Exporter(object):
         if device.humidity:
             self.metric_humidity_actual.labels(room=room, device_label=device.label).set(device.humidity)
         logging.info(
-            "room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, humidity_actual: {}"
+            "found device: room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, humidity_actual: {}"
             .format(room, device.label, device.actualTemperature, device.setPointTemperature, device.humidity)
         )
 
@@ -187,7 +214,7 @@ class Exporter(object):
         self.metric_valve_position.labels(room=room, device_label=device.label).set(device.valvePosition)
 
         logging.info(
-            "room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, valve_adaption_needed: {}, "
+            "found device: room: {}, label: {}, temperature_actual: {}, temperature_setpoint: {}, valve_adaption_needed: {}, "
             "temperature_offset {}, valve_position: {}"
                 .format(room, device.label, device.valveActualTemperature, device.setPointTemperature,
                         device.automaticValveAdaptionNeeded, device.temperatureOffset, device.valvePosition)
@@ -216,16 +243,32 @@ class Exporter(object):
 
     def __collect_power_metrics(self, room, device):
         logging.info(
-            "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
-                .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate,
-                        device.permanentlyReachable)
+            "found device: room: {}, label: {}, power_consumption: {}, energy_counter: {}"
+                .format(room, device.label, device.currentPowerConsumption, device.energyCounter)
         )
-        # general device info metric
-        logging.info(device.currentPowerConsumption)
-        self.metric_power_consumption.labels(
-            room=room,
-            device_label=device.label
-        ).set(device.currentPowerConsumption)
+        self.metric_power_consumption.labels(room=room,device_label=device.label).set(device.currentPowerConsumption),
+        self.metric_energy_counter.labels(room=room,device_label=device.label).set(device.energyCounter)
+
+    def __collect_switch_metrics(self, room, device):
+        logging.info(
+            "found device: room: {}, label: {}, switch_status: {}"
+                .format(room, device.label, device.on)
+        )        
+        self.metric_switch_on.labels(room=room,device_label=device.label).set(device.on)
+
+    def __collect_dim_level(self, room, device):
+        logging.info(
+            "found device: room: {}, label: {}, dim_level: {}"
+                .format(room, device.label, device.dimLevel)
+        )        
+        self.metric_dim_level.labels(room=room,device_label=device.label).set(device.dimLevel)
+
+    def __collect_window_state(self, room, device):
+        logging.info(
+            "found device: room: {}, label: {}, window_state: {}"
+                .format(room, device.label, device.windowState)
+        )        
+        self.metric_window_state.labels(room=room,device_label=device.label).state(device.windowState)
 
     def __collect_event_metrics(self, eventList):
         for event in eventList:
@@ -266,9 +309,19 @@ class Exporter(object):
                         elif isinstance(d, HeatingThermostat):
                             logging.info("Device of type heating")
                             self.__collect_heating_metrics(g.label, d)
-                        elif isinstance(d, PlugableSwitchMeasuring):
-                            logging.info("Device of type PlugableSwitchMeasuring")
+                        elif isinstance(d, SwitchMeasuring):
+                            logging.info("Device of type switch measuring")
                             self.__collect_power_metrics(g.label, d)
+                            self.__collect_switch_metrics(g.label, d)                            
+                        elif isinstance(d, Switch):
+                            logging.info("Device of type switch")
+                            self.__collect_switch_metrics(g.label, d)
+                        elif isinstance(d, Dimmer):
+                            logging.info("Device of type dimmer")
+                            self.__collect_dim_level(g.label, d)
+                        elif isinstance(d, (ShutterContact, ShutterContactMagnetic, ContactInterface, RotaryHandleSensor)):
+                            logging.info("Device of type contact")
+                            self.__collect_window_state(g.label, d)
 
         except Exception as e:
             logging.warning(
@@ -280,29 +333,39 @@ class Exporter(object):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
+    parser = configargparse.ArgumentParser(
         description='HomematicIP Prometheus Exporter',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument('--metric-port',
+                        type=int,
+                        env_var='METRIC_PORT',
                         default=8000,
                         help='port to expose the metrics on')
     parser.add_argument('--config-file',
+                        env_var='CONFIG_FILE',
                         default='/etc/homematicip-rest-api/config.ini',
                         help='path to the configuration file')
     parser.add_argument('--collect-interval-seconds',
+                        type=int,
+                        env_var='COLLECT_INTERVAL_SECONDS',
                         default=30,
                         help='collection interval in seconds')
     parser.add_argument('--auth-token',
+                        env_var='AUTH_TOKEN',
                         default=None,
                         help='homematic IP auth token')
     parser.add_argument('--access-point',
+                        env_var='ACCESS_POINT',
                         default=None,
                         help='homematic IP access point id')
     parser.add_argument('--enable-event-metrics',
+                        env_var='ENABLE_EVENT_METRICS',
                         default=False,
                         help='collect event metrics')
     parser.add_argument('--log-level',
+                        type=int,
+                        env_var='LOG_LEVEL',
                         default=30,
                         help='log level')
 
