@@ -8,7 +8,7 @@ from homematicip.home import Home, EventType
 from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, \
     TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, HeatingThermostat, \
     ShutterContact, ShutterContactMagnetic, ContactInterface, RotaryHandleSensor, \
-    Switch, SwitchMeasuring
+    Switch, SwitchMeasuring, Dimmer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
@@ -150,6 +150,12 @@ class Exporter(object):
             labelnames=labelnames,
             namespace=namespace
         )
+        self.metric_dim_level = prometheus_client.Gauge(
+            name='dim_level',
+            documentation='Current dimmer level',
+            labelnames=labelnames,
+            namespace=namespace
+        )        
         self.metric_window_state = prometheus_client.Enum(
             states = ["OPEN", "CLOSED"],
             name='window_state',
@@ -234,20 +240,6 @@ class Exporter(object):
                 device_label=device.label
             ).set(device.lastStatusUpdate.timestamp())
 
-    def __collect_switch_metrics(self, room, device):
-        logging.info(
-            "found device: room: {}, label: {}, switch_status: {}"
-                .format(room, device.label, device.on)
-        )        
-        self.metric_switch_on.labels(room=room,device_label=device.label).set(device.on)
-
-    def __collect_window_state(self, room, device):
-        logging.info(
-            "found device: room: {}, label: {}, window_state: {}"
-                .format(room, device.label, device.windowState)
-        )        
-        self.metric_window_state.labels(room=room,device_label=device.label).state(device.windowState)
-
     def __collect_power_metrics(self, room, device):
         logging.info(
             "found device: room: {}, label: {}, power_consumption: {}, energy_counter: {}"
@@ -255,6 +247,27 @@ class Exporter(object):
         )
         self.metric_power_consumption.labels(room=room,device_label=device.label).set(device.currentPowerConsumption),
         self.metric_energy_counter.labels(room=room,device_label=device.label).set(device.energyCounter)
+
+    def __collect_switch_metrics(self, room, device):
+        logging.info(
+            "found device: room: {}, label: {}, switch_status: {}"
+                .format(room, device.label, device.on)
+        )        
+        self.metric_switch_on.labels(room=room,device_label=device.label).set(device.on)
+
+    def __collect_dim_level(self, room, device):
+        logging.info(
+            "found device: room: {}, label: {}, dim_level: {}"
+                .format(room, device.label, device.dimLevel)
+        )        
+        self.metric_dim_level.labels(room=room,device_label=device.label).set(device.dimLevel)
+
+    def __collect_window_state(self, room, device):
+        logging.info(
+            "found device: room: {}, label: {}, window_state: {}"
+                .format(room, device.label, device.windowState)
+        )        
+        self.metric_window_state.labels(room=room,device_label=device.label).state(device.windowState)
 
     def __collect_event_metrics(self, eventList):
         for event in eventList:
@@ -300,8 +313,11 @@ class Exporter(object):
                             self.__collect_power_metrics(g.label, d)
                             self.__collect_switch_metrics(g.label, d)                            
                         elif isinstance(d, Switch):
-                            logging.info("Device of type switch measuring")
+                            logging.info("Device of type switch")
                             self.__collect_switch_metrics(g.label, d)
+                        elif isinstance(d, Dimmer):
+                            logging.info("Device of type dimmer")
+                            self.__collect_dim_level(g.label, d)
                         elif isinstance(d, (ShutterContact, ShutterContactMagnetic, ContactInterface, RotaryHandleSensor)):
                             logging.info("Device of type contact")
                             self.__collect_window_state(g.label, d)
