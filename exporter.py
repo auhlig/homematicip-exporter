@@ -3,6 +3,7 @@ import sys
 import time
 import logging
 import homematicip
+import configargparse
 import prometheus_client
 from homematicip.home import Home, EventType
 from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, \
@@ -332,29 +333,39 @@ class Exporter(object):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
+    parser = configargparse.ArgumentParser(
         description='HomematicIP Prometheus Exporter',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument('--metric-port',
+                        type=int,
+                        env_var='METRIC_PORT',
                         default=8000,
                         help='port to expose the metrics on')
     parser.add_argument('--config-file',
+                        env_var='CONFIG_FILE',
                         default='/etc/homematicip-rest-api/config.ini',
                         help='path to the configuration file')
     parser.add_argument('--collect-interval-seconds',
+                        type=int,
+                        env_var='COLLECT_INTERVAL_SECONDS',
                         default=30,
                         help='collection interval in seconds')
     parser.add_argument('--auth-token',
+                        env_var='AUTH_TOKEN',
                         default=None,
                         help='homematic IP auth token')
     parser.add_argument('--access-point',
+                        env_var='ACCESS_POINT',
                         default=None,
                         help='homematic IP access point id')
     parser.add_argument('--enable-event-metrics',
+                        env_var='ENABLE_EVENT_METRICS',
                         default=False,
                         help='collect event metrics')
     parser.add_argument('--log-level',
+                        type=int,
+                        env_var='LOG_LEVEL',
                         default=30,
                         help='log level')
 
