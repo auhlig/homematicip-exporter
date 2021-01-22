@@ -7,7 +7,7 @@ import prometheus_client
 from homematicip.home import Home, EventType
 from homematicip.device import WallMountedThermostatPro, TemperatureHumiditySensorWithoutDisplay, \
     TemperatureHumiditySensorOutdoor, TemperatureHumiditySensorDisplay, ShutterContact, HeatingThermostat, \
-    PlugableSwitchMeasuring
+    PlugableSwitchMeasuring, WindowState
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
@@ -137,6 +137,12 @@ class Exporter(object):
             labelnames=labelnames,
             namespace=namespace
         )
+        self.metric_contact_open = prometheus_client.Gauge(
+            name='contact_open',
+            documentation='Shutter contact open (1 for open 0 for closed)',
+            labelnames=labelnames,
+            namespace=namespace
+        )
         self.metric_device_event = prometheus_client.Counter(
             name='device_event',
             documentation='events triggered by a device',
@@ -192,6 +198,19 @@ class Exporter(object):
                 .format(room, device.label, device.valveActualTemperature, device.setPointTemperature,
                         device.automaticValveAdaptionNeeded, device.temperatureOffset, device.valvePosition)
         )
+
+    def __collect_shutter_metrics(self, room, device):
+        logging.info(
+            "found device: room: {}, label: {}, device_type: {}, firmware_version: {}, last_status_update: {}, permanently_reachable: {}"
+                .format(room, device.label, device.deviceType.lower(), device.firmwareVersion, device.lastStatusUpdate,
+                        device.permanentlyReachable)
+        )
+
+        shutter_open = 0
+        if device.windowState != WindowState.CLOSED:
+            shutter_open = 1
+
+        self.metric_contact_open.labels(room=room, device_label=device.label).set(shutter_open)
 
     def __collect_device_info_metrics(self,room, device):
         logging.info(
@@ -269,6 +288,8 @@ class Exporter(object):
                         elif isinstance(d, PlugableSwitchMeasuring):
                             logging.info("Device of type PlugableSwitchMeasuring")
                             self.__collect_power_metrics(g.label, d)
+                        elif isinstance(d, ShutterContact):
+                            self.__collect_shutter_metrics(g.label, d)
 
         except Exception as e:
             logging.warning(
@@ -276,7 +297,7 @@ class Exporter(object):
             )
         finally:
             logging.info('waiting {}s before next collection cycle'.format(self.__collect_interval_seconds))
-            time.sleep(self.__collect_interval_seconds)
+            time.sleep(int(self.__collect_interval_seconds))
 
 
 if __name__ == '__main__':
