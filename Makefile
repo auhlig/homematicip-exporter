@@ -1,4 +1,4 @@
-IMAGE   ?= auhlig/homematicip-exporter
+IMAGE   ?= mineyannik/homematicip-exporter
 VERSION = $(shell git rev-parse --verify HEAD | head -c 8)
 
 build: clean-build
