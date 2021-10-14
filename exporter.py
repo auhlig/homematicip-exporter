@@ -276,7 +276,7 @@ class Exporter(object):
             )
         finally:
             logging.info('waiting {}s before next collection cycle'.format(self.__collect_interval_seconds))
-            time.sleep(self.__collect_interval_seconds)
+            time.sleep(int(self.__collect_interval_seconds))
 
 
 if __name__ == '__main__':
