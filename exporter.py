@@ -296,7 +296,8 @@ if __name__ == '__main__':
                         help='path to the configuration file')
     parser.add_argument('--collect-interval-seconds',
                         default=30,
-                        help='collection interval in seconds')
+                        help='collection interval in seconds',
+                        type=int)
     parser.add_argument('--auth-token',
                         default=None,
                         help='homematic IP auth token')
